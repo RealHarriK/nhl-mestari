@@ -3,113 +3,138 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NHL Stanley Cup 2026 - Live Fix</title>
+    <title>NHL Stanley Cup 2026 - AI Tracker</title>
     <style>
-        :root { --dark: #0f172a; --accent: #38bdf8; --gold: #fbbf24; }
-        body { font-family: 'Inter', system-ui, sans-serif; background: var(--dark); color: white; margin: 0; padding: 20px; }
-        .container { max-width: 800px; margin: auto; }
-        .card { background: #1e293b; border-radius: 16px; padding: 24px; box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
-        h1 { text-align: center; color: var(--gold); margin-bottom: 8px; }
-        .status { text-align: center; font-size: 0.85rem; color: var(--accent); margin-bottom: 20px; font-family: monospace; }
-        
-        .team-row { 
-            display: flex; align-items: center; padding: 16px; 
-            border-bottom: 1px solid #334155; transition: 0.2s;
+        :root { 
+            --bg: #0f172a; --card: #1e293b; --accent: #38bdf8; 
+            --gold: #fbbf24; --text: #f8fafc; --muted: #94a3b8; 
         }
-        .team-row:hover { background: #334155; border-radius: 8px; }
-        .rank { width: 40px; font-weight: bold; color: #94a3b8; }
-        .name { flex-grow: 1; font-size: 1.1rem; font-weight: 600; }
-        .prob { font-size: 1.4rem; font-weight: 800; color: var(--gold); min-width: 80px; text-align: right; }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background-color: var(--bg); color: var(--text); 
+            margin: 0; padding: 20px; line-height: 1.6;
+        }
+        .container { max-width: 800px; margin: 0 auto; }
+        .header { 
+            text-align: center; padding: 40px 20px; 
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            border-radius: 20px; border: 1px solid #334155; margin-bottom: 30px;
+        }
+        h1 { margin: 0; color: var(--gold); letter-spacing: 1px; font-size: 2rem; }
+        .status-bar { font-family: monospace; color: var(--accent); font-size: 0.9rem; margin-top: 10px; }
         
+        .team-card { 
+            background: var(--card); border-radius: 12px; padding: 20px; 
+            margin-bottom: 12px; display: flex; align-items: center;
+            border: 1px solid #334155; transition: transform 0.2s, border-color 0.2s;
+        }
+        .team-card:hover { transform: translateY(-3px); border-color: var(--accent); }
+        
+        .rank { font-size: 2rem; font-weight: 800; color: var(--muted); min-width: 50px; opacity: 0.5; }
+        .info { flex-grow: 1; }
+        .name { font-size: 1.25rem; font-weight: bold; margin: 0; display: block; }
+        .metrics { font-size: 0.85rem; color: var(--muted); margin-top: 4px; }
+        
+        .prob-container { text-align: right; }
+        .prob-value { font-size: 1.8rem; font-weight: 900; color: var(--gold); display: block; }
+        .label { font-size: 0.7rem; text-transform: uppercase; color: var(--accent); font-weight: bold; }
+
         button { 
-            width: 100%; padding: 16px; margin-top: 20px; border: none; border-radius: 12px;
-            background: var(--accent); color: var(--dark); font-weight: bold; cursor: pointer;
-            font-size: 1rem; transition: 0.2s;
+            width: 100%; padding: 18px; background: var(--accent); color: var(--bg);
+            border: none; border-radius: 12px; font-weight: 800; cursor: pointer;
+            font-size: 1rem; margin-top: 20px; transition: 0.2s;
         }
-        button:hover { filter: brightness(1.1); transform: translateY(-2px); }
-        .error-msg { color: #f87171; text-align: center; padding: 20px; display: none; }
+        button:hover { filter: brightness(1.1); transform: scale(1.01); }
+        
+        #error { color: #f87171; text-align: center; display: none; padding: 20px; background: rgba(248, 113, 113, 0.1); border-radius: 10px; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <div class="card">
-        <h1>🏒 Stanley Cup Ennuste</h1>
-        <div id="status" class="status">YHDISTETÄÄN NHL-TIETOKANTAAN...</div>
-        
-        <div id="errorArea" class="error-msg">
-            Yhteysvirhe. NHL:n rajapinta on tilapäisesti saavuttamaton tai selain estää haun.
-        </div>
-
-        <div id="results"></div>
-
-        <button onclick="loadData()">PÄIVITÄ TILANNE NYT</button>
+    <div class="header">
+        <h1>🏆 STANLEY CUP 2026 ANALYYSI</h1>
+        <div id="status" class="status-bar">ODOTETAAN SYNKRONOINTIA...</div>
     </div>
+
+    <div id="error">Yhteys NHL-palvelimeen epäonnistui. Tarkista nettiyhteys.</div>
+    <div id="results"></div>
+
+    <button onclick="updateAnalysis()">PÄIVITÄ REAALIAIKAISET TILASTOT</button>
 </div>
 
 <script>
-    async function loadData() {
+    // Algoritmi joka analysoi datan
+    function calculateProbability(team) {
+        // Painotukset:
+        // 1. Pisteprosentti (70% paino)
+        // 2. Maaliero per ottelu (20% paino)
+        // 3. Kuntoputki (10% paino)
+        const pPct = team.pointPctg;
+        const gDiff = team.goalDiff / team.gamesPlayed;
+        const streakBonus = team.streakCode?.startsWith('W') ? parseInt(team.streakCode.substring(1)) * 0.02 : 0;
+        
+        const score = (pPct * 80) + (gDiff * 10) + (streakBonus * 10);
+        return Math.max(1.0, score);
+    }
+
+    async function updateAnalysis() {
         const status = document.getElementById('status');
         const results = document.getElementById('results');
-        const errorArea = document.getElementById('errorArea');
+        const errorDiv = document.getElementById('error');
         
-        status.innerText = "HAETAAN REAALIAIKAISTA DATAA...";
-        errorArea.style.display = "none";
+        status.innerText = "NOUDETAAN DATAAL NHL.COM...";
+        errorDiv.style.display = "none";
 
         try {
-            // Käytetään virallista NHL API:a
-            // Huom: Jos tämä antaa CORS-virheen paikallisesti, kokeile avata sivu esim. VS Coden 'Live Serverillä'
+            // NHL:n virallinen Standings API (toimii suoraan GitHub Pagesissa)
             const response = await fetch('https://api-web.nhle.com/v1/standings/now');
-            
-            if (!response.ok) throw new Error('Verkkovirhe');
+            if (!response.ok) throw new Error("API virhe");
             
             const data = await response.json();
             
-            // Analysoidaan joukkueet
-            const analyzed = data.standings.map(team => {
-                // Algoritmi: (Pisteprosentti * 70) + (Maaliero/5) + (Voittoputki * 2)
-                const streakBonus = team.streakCode?.startsWith('W') ? parseInt(team.streakCode.substring(1)) * 1.5 : 0;
-                const probability = (team.pointPctg * 70) + (team.goalDiff / 8) + streakBonus;
+            // Käsitellään kaikki joukkueet
+            const analyzedTeams = data.standings.map(t => ({
+                name: t.teamName.default,
+                prob: calculateProbability(t),
+                pointsPct: (t.pointPctg * 100).toFixed(1),
+                streak: t.streakCode || '-',
+                diff: t.goalDiff
+            }));
 
-                return {
-                    name: team.teamName.default,
-                    prob: Math.max(1, probability), // Vähintään 1% mahdollisuus
-                    stats: `Pisteet: ${(team.pointPctg * 100).toFixed(1)}% | Vire: ${team.streakCode || 'N/A'}`
-                };
-            });
+            // Järjestetään ja otetaan top 8
+            const top8 = analyzedTeams.sort((a, b) => b.prob - a.prob).slice(0, 8);
 
-            // Lajittelu ja Top 7
-            const top7 = analyzed.sort((a, b) => b.prob - a.prob).slice(0, 7);
-            
-            // Tulostus
             results.innerHTML = '';
-            top7.forEach((t, i) => {
+            top8.forEach((t, i) => {
                 results.innerHTML += `
-                    <div class="team-row">
-                        <div class="rank">#${i+1}</div>
-                        <div class="name">
-                            ${t.name}<br>
-                            <span style="font-size: 0.7rem; color: #94a3b8;">${t.stats}</span>
+                    <div class="team-card">
+                        <div class="rank">${i + 1}</div>
+                        <div class="info">
+                            <span class="name">${t.name}</span>
+                            <div class="metrics">
+                                Pistekeskiarvo: ${t.pointsPct}% | Vire: ${t.streak} | Maaliero: ${t.diff > 0 ? '+' : ''}${t.diff}
+                            </div>
                         </div>
-                        <div class="prob">${t.prob.toFixed(1)}%</div>
+                        <div class="prob-container">
+                            <span class="label">Mestaruus-Tn</span>
+                            <span class="prob-value">${t.prob.toFixed(1)}%</span>
+                        </div>
                     </div>
                 `;
             });
 
-            status.innerText = "PÄIVITETTY: " + new Date().toLocaleTimeString();
+            status.innerText = "PÄIVITETTY: " + new Date().toLocaleTimeString('fi-FI');
 
-        } catch (error) {
-            console.error(error);
+        } catch (err) {
+            console.error(err);
             status.innerText = "YHTEYSVIRHE";
-            errorArea.style.display = "block";
-            
-            // Vara-data jos haku epäonnistuu kokonaan (esim. ilman internetyhteyttä)
-            results.innerHTML = "<p style='text-align:center; color:#94a3b8;'>Rajapinta vaatii palvelimen toimiakseen. Testaa päivittämällä sivu uudelleen.</p>";
+            errorDiv.style.display = "block";
         }
     }
 
-    // Lataa tiedot kun sivu avataan
-    loadData();
+    // Lataa data heti kun sivu avataan
+    window.onload = updateAnalysis;
 </script>
 
 </body>
