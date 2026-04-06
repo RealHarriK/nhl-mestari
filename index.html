@@ -14,13 +14,13 @@
             background-color: var(--bg); color: var(--text); 
             margin: 0; padding: 20px; line-height: 1.6;
         }
-        .container { max-width: 800px; margin: 0 auto; }
+        .container { max-width: 820px; margin: 0 auto; }
         .header { 
             text-align: center; padding: 40px 20px; 
             background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
             border-radius: 20px; border: 1px solid #334155; margin-bottom: 30px;
         }
-        h1 { margin: 0; color: var(--gold); letter-spacing: 1px; font-size: 2rem; }
+        h1 { margin: 0; color: var(--gold); letter-spacing: 1px; font-size: 2.1rem; }
         .status-bar { font-family: monospace; color: var(--accent); font-size: 0.9rem; margin-top: 10px; }
         
         .team-card { 
@@ -30,49 +30,57 @@
         }
         .team-card:hover { transform: translateY(-3px); border-color: var(--accent); }
         
-        .rank { font-size: 2rem; font-weight: 800; color: var(--muted); min-width: 50px; opacity: 0.5; }
+        .rank { font-size: 2.1rem; font-weight: 800; color: var(--muted); min-width: 55px; opacity: 0.6; }
         .info { flex-grow: 1; }
-        .name { font-size: 1.25rem; font-weight: bold; margin: 0; display: block; }
+        .name { font-size: 1.3rem; font-weight: bold; margin: 0; }
         .metrics { font-size: 0.85rem; color: var(--muted); margin-top: 4px; }
         
         .prob-container { text-align: right; }
-        .prob-value { font-size: 1.8rem; font-weight: 900; color: var(--gold); display: block; }
-        .label { font-size: 0.7rem; text-transform: uppercase; color: var(--accent); font-weight: bold; }
+        .prob-value { font-size: 1.85rem; font-weight: 900; color: var(--gold); display: block; }
+        .label { font-size: 0.7rem; text-transform: uppercase; color: var(--accent); font-weight: bold; letter-spacing: 0.5px; }
 
         button { 
             width: 100%; padding: 18px; background: var(--accent); color: var(--bg);
             border: none; border-radius: 12px; font-weight: 800; cursor: pointer;
-            font-size: 1rem; margin-top: 20px; transition: 0.2s;
+            font-size: 1.1rem; margin-top: 25px; transition: 0.3s;
         }
-        button:hover { filter: brightness(1.1); transform: scale(1.01); }
-        
-        #error { color: #f87171; text-align: center; display: none; padding: 20px; background: rgba(248, 113, 113, 0.1); border-radius: 10px; }
+        button:hover { filter: brightness(1.15); transform: scale(1.02); }
+
+        #error { 
+            color: #f87171; text-align: center; display: none; 
+            padding: 20px; background: rgba(248, 113, 113, 0.1); 
+            border-radius: 10px; margin: 15px 0;
+        }
+        .loading { text-align: center; padding: 30px; color: var(--accent); }
     </style>
 </head>
 <body>
 
 <div class="container">
     <div class="header">
-        <h1>🏆 STANLEY CUP 2026 ANALYYSI</h1>
-        <div id="status" class="status-bar">ODOTETAAN SYNKRONOINTIA...</div>
+        <h1>🏆 STANLEY CUP 2026 AI TRACKER</h1>
+        <div id="status" class="status-bar">VALMIS LADATTAVAKSI</div>
     </div>
 
-    <div id="error">Yhteys NHL-palvelimeen epäonnistui. Kokeile ladata sivu uudelleen hetken kuluttua.</div>
+    <div id="error"></div>
     <div id="results"></div>
 
-    <button onclick="updateAnalysis()">PÄIVITÄ REAALIAIKAISET TILASTOT</button>
+    <button onclick="updateAnalysis()">🔄 PÄIVITÄ REAALIAIKAISET TILASTOT</button>
+    
+    <p style="text-align:center; margin-top:25px; font-size:0.8rem; color:#64748b;">
+        Vain hauska AI-ennuste perustuen NHL:n virallisiin tilastoihin • Ei virallinen ennuste
+    </p>
 </div>
 
 <script>
-    // Algoritmi joka laskee menestysmahdollisuudet
     function calculateProbability(team) {
-        const pPct = team.pointPctg;
-        const gDiff = team.goalDiff / team.gamesPlayed;
-        const streakBonus = team.streakCode?.startsWith('W') ? parseInt(team.streakCode.substring(1)) * 0.02 : 0;
+        const pPct = team.pointPctg || 0;
+        const gDiffPerGame = team.gamesPlayed ? (team.goalDiff / team.gamesPlayed) : 0;
+        const streakBonus = team.streakCode?.startsWith('W') ? Math.min(parseInt(team.streakCode.substring(1)) * 0.015, 0.12) : 0;
         
-        // Painotetaan pisteprosenttia ja maalieroa
-        const score = (pPct * 80) + (gDiff * 15) + (streakBonus * 5);
-        return Math.max(1.0, score);
+        let score = (pPct * 75) + (gDiffPerGame * 18) + (streakBonus * 7);
+        score = Math.min(score, 99); // ei yli 99%
+        return Math.max(1, score);
     }
 
     async function updateAnalysis() {
@@ -80,31 +88,32 @@
         const results = document.getElementById('results');
         const errorDiv = document.getElementById('error');
         
-        status.innerText = "YHDISTETÄÄN NHL-TIETOKANTAAN...";
+        status.innerText = "📡 HAETAAN NHL-TILASTOJA...";
         errorDiv.style.display = "none";
+        results.innerHTML = `<div class="loading">⏳ Ladataan reaaliaikaisia tilastoja...</div>`;
 
         try {
-            // NHL API:n osoite
             const targetUrl = 'https://api-web.nhle.com/v1/standings/now';
-            // Käytetään allorigins-proxyä kiertämään selainestot (CORS)
-            const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`;
+            const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
             
             const response = await fetch(proxyUrl);
-            if (!response.ok) throw new Error("Yhteysvirhe proxy-palvelimeen");
             
-            const json = await response.json();
-            // AllOrigins palauttaa datan 'contents'-kentässä tekstimuodossa
-            const data = JSON.parse(json.contents);
+            if (!response.ok) throw new Error(`HTTP-virhe: ${response.status}`);
             
+            const data = await response.json();
+
+            if (!data.standings || !Array.isArray(data.standings)) {
+                throw new Error("Virheellinen data NHL API:sta");
+            }
+
             const analyzedTeams = data.standings.map(t => ({
-                name: t.teamName.default,
+                name: t.teamName?.default || t.teamName?.fi || "Tuntematon",
                 prob: calculateProbability(t),
                 pointsPct: (t.pointPctg * 100).toFixed(1),
                 streak: t.streakCode || '-',
-                diff: t.goalDiff
+                diff: t.goalDiff || 0
             }));
 
-            // Järjestetään top 8
             const top8 = analyzedTeams.sort((a, b) => b.prob - a.prob).slice(0, 8);
 
             results.innerHTML = '';
@@ -119,23 +128,28 @@
                             </div>
                         </div>
                         <div class="prob-container">
-                            <span class="label">Mestaruus-Tn</span>
+                            <span class="label">MESTARUUS-TN</span>
                             <span class="prob-value">${t.prob.toFixed(1)}%</span>
                         </div>
                     </div>
                 `;
             });
 
-            status.innerText = "TIEDOT PÄIVITETTY: " + new Date().toLocaleTimeString('fi-FI');
+            status.innerText = `✅ PÄIVITETTY ${new Date().toLocaleTimeString('fi-FI')}`;
 
         } catch (err) {
-            console.error("Virhe tiedonhakemisessa:", err);
-            status.innerText = "YHTEYSVIRHE";
+            console.error(err);
+            status.innerText = "❌ YHTEYSVIRHE";
+            errorDiv.innerHTML = `
+                Yhteys NHL-tilastoihin epäonnistui.<br>
+                Kokeile hetken kuluttua uudelleen tai tarkista nettiyhteytesi.
+            `;
             errorDiv.style.display = "block";
+            results.innerHTML = '';
         }
     }
 
-    // Suoritetaan automaattisesti kun sivu ladataan
+    // Ladataan automaattisesti sivun avauksessa
     window.onload = updateAnalysis;
 </script>
 
