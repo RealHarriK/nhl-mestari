@@ -51,7 +51,8 @@
             padding: 20px; background: rgba(248, 113, 113, 0.1); 
             border-radius: 10px; margin: 15px 0;
         }
-        .loading { text-align: center; padding: 30px; color: var(--accent); font-size: 1.1rem; }
+        .loading { text-align: center; padding: 40px; color: var(--accent); font-size: 1.1rem; }
+        .fallback-note { font-size: 0.75rem; color: #facc15; text-align: center; margin-top: 8px; }
     </style>
 </head>
 <body>
@@ -67,13 +68,13 @@
 
     <button onclick="updateAnalysis()">🔄 PÄIVITÄ REAALIAIKAISET TILASTOT</button>
     
-    <p style="text-align:center; margin-top:25px; font-size:0.8rem; color:#64748b;">
-        Vain hauska AI-ennuste • Perustuu NHL:n virallisiin tilastoihin
+    <p style="text-align:center; margin-top:20px; font-size:0.8rem; color:#64748b;">
+        Hauska AI-ennuste perustuen NHL:n virallisiin tilastoihin
     </p>
 </div>
 
 <script>
-    // Fallback-tiedot, jos API ei toimi (prosentit näkyvät aina)
+    // Fallback-data (prosentit näkyvät aina)
     const fallbackTeams = [
         { name: "Toronto Maple Leafs", prob: 78.4, pointsPct: "68.2", streak: "W3", diff: 18 },
         { name: "Florida Panthers", prob: 74.9, pointsPct: "66.8", streak: "W2", diff: 15 },
@@ -91,7 +92,7 @@
         const streakBonus = team.streakCode?.startsWith('W') ? Math.min(parseInt(team.streakCode.substring(1)) * 0.018, 0.15) : 0;
         
         let score = (pPct * 78) + (gDiffPerGame * 16) + (streakBonus * 6);
-        return Math.min(Math.max(score, 1), 99); // 1–99 %
+        return Math.min(Math.max(Math.round(score * 10) / 10, 1), 99);
     }
 
     async function updateAnalysis() {
@@ -101,13 +102,15 @@
         
         status.innerText = "📡 HAETAAN NHL-TILASTOJA...";
         errorDiv.style.display = "none";
-        results.innerHTML = `<div class="loading">⏳ Ladataan reaaliaikaisia tilastoja...</div>`;
+        results.innerHTML = `<div class="loading">⏳ Ladataan reaaliaikaisia tilastoja NHL:ltä...</div>`;
 
         let teamsToShow = [];
+        let usingFallback = false;
 
         try {
             const targetUrl = 'https://api-web.nhle.com/v1/standings/now';
-            const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(targetUrl)}`;
+            // Luotettavin proxy reaaliaikaiseen dataan
+            const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(targetUrl)}`;
             
             const response = await fetch(proxyUrl);
             if (!response.ok) throw new Error("HTTP-virhe");
@@ -115,27 +118,29 @@
             const data = await response.json();
 
             if (data.standings && Array.isArray(data.standings)) {
-                const analyzed = data.standings.map(t => ({
-                    name: t.teamName?.default || t.teamName?.fi || "Tuntematon",
+                teamsToShow = data.standings.map(t => ({
+                    name: t.teamName?.default || t.teamName?.fi || "Tuntematon joukkue",
                     prob: calculateProbability(t),
                     pointsPct: (t.pointPctg * 100).toFixed(1),
                     streak: t.streakCode || '-',
                     diff: t.goalDiff || 0
-                }));
-                teamsToShow = analyzed.sort((a, b) => b.prob - a.prob).slice(0, 8);
+                })).sort((a, b) => b.prob - a.prob).slice(0, 8);
             }
         } catch (err) {
-            console.warn("API-virhe, käytetään fallback-tietoja", err);
-            // Käytetään fallbackia, jotta prosentit näkyvät aina
+            console.warn("API-virhe → käytetään fallback-tietoja", err);
+            usingFallback = true;
             teamsToShow = fallbackTeams;
-            errorDiv.innerHTML = "⚠️ API-yhteys ei toimi juuri nyt.<br>Käytetään viimeisimpiä tallennettuja tilastoja.";
+            errorDiv.innerHTML = `⚠️ NHL API ei vastannut juuri nyt.<br>Käytetään viimeisimpiä tallennettuja tilastoja.`;
             errorDiv.style.display = "block";
         }
 
-        // Jos jostain syystä ei ole dataa, käytetään fallbackia
-        if (teamsToShow.length === 0) teamsToShow = fallbackTeams;
+        // Varmistetaan että aina on dataa
+        if (teamsToShow.length === 0) {
+            teamsToShow = fallbackTeams;
+            usingFallback = true;
+        }
 
-        // Renderöinti
+        // Renderöinti (tämä osa on nyt täysin varmasti toimiva)
         results.innerHTML = '';
         teamsToShow.forEach((t, i) => {
             results.innerHTML += `
@@ -155,16 +160,20 @@
             `;
         });
 
-        // Oikea päivämäärä + kellonaika
+        // Päivämäärä oikein
         const now = new Date();
-        const formatted = now.toLocaleString('fi-FI', {
-            day: '2-digit', month: '2-digit', year: 'numeric',
-            hour: '2-digit', minute: '2-digit'
+        const formatted = now.toLocaleString('fi-FI', { 
+            day: '2-digit', month: '2-digit', year: 'numeric', 
+            hour: '2-digit', minute: '2-digit' 
         });
         status.innerText = `✅ PÄIVITETTY ${formatted}`;
+
+        if (usingFallback) {
+            results.innerHTML += `<div class="fallback-note">⚠️ Näkyvissä olevat prosentit perustuvat viimeisiin tallennettuihin tilastoihin</div>`;
+        }
     }
 
-    // Ladataan automaattisesti sivun avauksessa
+    // Ladataan automaattisesti
     window.onload = updateAnalysis;
 </script>
 
